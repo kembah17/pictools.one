@@ -1,0 +1,9 @@
+# *
+User-agent: *
+Allow: /
+
+# Host
+Host: https://pictools.one
+
+# Sitemaps
+Sitemap: https://pictools.one/sitemap.xml
