@@ -49,6 +49,14 @@ export const tools: ToolInfo[] = [
     icon: "🔤",
     keywords: ["image to base64", "base64 encoder", "base64 to image"],
   },
+  {
+    name: "Image to Text (OCR)",
+    slug: "image-to-text",
+    description: "Extract text from images using OCR. Supports preprocessing with contrast, grayscale, noise removal, and deskew for better accuracy.",
+    shortDesc: "Extract text from images with OCR",
+    icon: "📝",
+    keywords: ["image to text", "OCR", "extract text from image", "photo to text"],
+  },
 ];
 
 export const articles = [
