@@ -2,8 +2,13 @@ import type { Metadata } from "next";
 import "./globals.css";
 import Header from "@/components/layout/Header";
 import Footer from "@/components/layout/Footer";
+import GoogleAnalytics from "@/components/analytics/GoogleAnalytics";
+
+// GSC verification loaded from env
+const gscVerification = process.env.NEXT_PUBLIC_GSC_VERIFICATION;
 
 export const metadata: Metadata = {
+  ...(gscVerification && { verification: { google: gscVerification } }),
   title: {
     default: "PicTools.one — Free Online Image Tools",
     template: "%s | PicTools.one",
@@ -41,6 +46,7 @@ export default function RootLayout({
         />
       </head>
       <body className="min-h-screen flex flex-col bg-page-bg dark:bg-page-bg-dark text-text dark:text-text-dark">
+        <GoogleAnalytics />
         <Header />
         <main className="flex-1">{children}</main>
         <Footer />
