@@ -1,6 +1,6 @@
 "use client";
 import { useState, useCallback, useRef, useEffect } from "react";
-import Tesseract from "tesseract.js";
+import { createWorker } from "tesseract.js";
 import DropZone from "@/components/ui/DropZone";
 import ProgressBar from "@/components/ui/ProgressBar";
 import { fileToDataUrl, loadImage } from "@/lib/utils";
@@ -168,23 +168,31 @@ export default function ImageOCR() {
         ? applyPreprocessing(sourceCanvasRef.current, preprocessing)
         : sourceCanvasRef.current;
 
-      const recognizeResult = await Tesseract.recognize(
-        processedCanvas,
-        language,
-        {
-          logger: (m) => {
-            if (m.status === "recognizing text") {
-              setProgress(m.progress * 100);
-              setProgressLabel("Recognizing text...");
-            } else if (m.status === "loading language traineddata") {
-              setProgress(m.progress * 100);
-              setProgressLabel("Loading language data...");
-            } else {
-              setProgressLabel(m.status || "Processing...");
-            }
-          },
-        }
-      );
+      // Create worker with proper v7 API
+      const worker = await createWorker(language, 1, {
+        logger: (m) => {
+          if (m.status === "recognizing text") {
+            setProgress(m.progress * 100);
+            setProgressLabel("Recognizing text...");
+          } else if (m.status === "loading language traineddata") {
+            setProgress(m.progress * 100);
+            setProgressLabel("Loading language data...");
+          } else {
+            setProgressLabel(m.status || "Processing...");
+          }
+        },
+      });
+
+      // Convert canvas to Blob for reliable input (avoids silent failures with raw canvas)
+      const blob = await new Promise<Blob>((resolve, reject) => {
+        processedCanvas.toBlob(
+          (b) => (b ? resolve(b) : reject(new Error("Canvas toBlob failed"))),
+          "image/png"
+        );
+      });
+
+      const recognizeResult = await worker.recognize(blob);
+      await worker.terminate();
 
       const text = recognizeResult.data.text.trim();
       const confidence = recognizeResult.data.confidence;

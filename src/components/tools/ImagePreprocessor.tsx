@@ -9,12 +9,12 @@ export interface PreprocessingOptions {
 }
 
 export const defaultPreprocessingOptions: PreprocessingOptions = {
-  grayscale: false,
-  contrast: false,
+  grayscale: true,
+  contrast: true,
   contrastIntensity: 150,
   noiseRemoval: false,
   deskew: false,
-  binarize: false,
+  binarize: true,
   binarizeThreshold: 128,
 };
 
