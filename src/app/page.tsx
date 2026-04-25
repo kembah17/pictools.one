@@ -1,6 +1,7 @@
 import Link from "next/link";
-import { tools, articles } from "@/lib/tools-data";
+import { articles } from "@/lib/tools-data";
 import AdSlot from "@/components/ui/AdSlot";
+import HomeToolGrid from "@/components/ui/HomeToolGrid";
 
 export default function HomePage() {
   return (
@@ -24,27 +25,7 @@ export default function HomePage() {
 
       {/* Tools Grid */}
       <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 -mt-12 relative z-10">
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
-          {tools.map((tool) => (
-            <Link
-              key={tool.slug}
-              href={`/${tool.slug}`}
-              className="group bg-surface dark:bg-surface-dark-alt border border-border dark:border-border-dark rounded-xl p-6 shadow-md hover:shadow-lg transition-all duration-200 hover:-translate-y-1"
-              style={{ boxShadow: "0 2px 8px 0 rgba(0,0,0,0.08)" }}
-            >
-              <div className="text-4xl mb-3">{tool.icon}</div>
-              <h2 className="text-lg font-bold text-text dark:text-text-dark group-hover:text-primary dark:group-hover:text-primary-light transition-colors">
-                {tool.name}
-              </h2>
-              <p className="mt-2 text-sm text-text-light dark:text-text-dark-muted">
-                {tool.description}
-              </p>
-              <span className="inline-block mt-4 text-sm font-medium text-primary dark:text-primary-light group-hover:underline">
-                Use Tool →
-              </span>
-            </Link>
-          ))}
-        </div>
+        <HomeToolGrid />
       </section>
 
       {/* Ad Slot */}
@@ -54,10 +35,10 @@ export default function HomePage() {
 
       {/* Features Section */}
       <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 mt-16">
-        <h2 className="text-2xl sm:text-3xl font-bold text-center text-text dark:text-text-dark">
+        <h2 className="text-2xl sm:text-3xl font-bold text-center" style={{ color: 'var(--color-text-heading)' }}>
           Why Use PicTools.one?
         </h2>
-        <div className="mt-8 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '1.5rem', marginTop: '2rem' }}>
           {[
             { icon: "🔒", title: "100% Private", desc: "Images are processed locally in your browser. Nothing is uploaded to any server." },
             { icon: "⚡", title: "Lightning Fast", desc: "No waiting for uploads or downloads. Processing starts instantly on your device." },
@@ -66,12 +47,18 @@ export default function HomePage() {
           ].map((feature) => (
             <div
               key={feature.title}
-              className="bg-surface dark:bg-surface-dark-alt border border-border dark:border-border-dark rounded-xl p-5 text-center shadow-md"
-              style={{ boxShadow: "0 2px 8px 0 rgba(0,0,0,0.08)" }}
+              style={{
+                backgroundColor: 'var(--color-bg-card)',
+                border: '2px solid var(--color-border)',
+                borderRadius: '0.75rem',
+                padding: '1.25rem',
+                textAlign: 'center',
+                boxShadow: 'var(--shadow-sm)',
+              }}
             >
-              <div className="text-3xl mb-2">{feature.icon}</div>
-              <h3 className="font-semibold text-text dark:text-text-dark">{feature.title}</h3>
-              <p className="mt-1 text-sm text-text-light dark:text-text-dark-muted">{feature.desc}</p>
+              <div style={{ fontSize: '2rem', marginBottom: '0.5rem' }}>{feature.icon}</div>
+              <h3 className="font-semibold" style={{ color: 'var(--color-text-heading)' }}>{feature.title}</h3>
+              <p className="mt-1 text-sm" style={{ color: 'var(--color-text-secondary)' }}>{feature.desc}</p>
             </div>
           ))}
         </div>
@@ -79,24 +66,32 @@ export default function HomePage() {
 
       {/* Articles Section */}
       <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 mt-16 mb-8">
-        <h2 className="text-2xl sm:text-3xl font-bold text-center text-text dark:text-text-dark">
+        <h2 className="text-2xl sm:text-3xl font-bold text-center" style={{ color: 'var(--color-text-heading)' }}>
           Image Guides & Tutorials
         </h2>
-        <div className="mt-8 grid grid-cols-1 sm:grid-cols-2 gap-6">
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '1.5rem', marginTop: '2rem' }}>
           {articles.map((article) => (
             <Link
               key={article.slug}
               href={`/${article.slug}`}
-              className="group bg-surface dark:bg-surface-dark-alt border border-border dark:border-border-dark rounded-xl p-5 shadow-md hover:shadow-lg transition-all duration-200"
-              style={{ boxShadow: "0 2px 8px 0 rgba(0,0,0,0.08)" }}
+              style={{
+                display: 'block',
+                padding: '1.25rem',
+                borderRadius: '0.75rem',
+                textDecoration: 'none',
+                backgroundColor: 'var(--color-bg-card)',
+                border: '2px solid var(--color-border)',
+                boxShadow: 'var(--shadow-sm)',
+                transition: 'all 0.2s ease',
+              }}
             >
-              <h3 className="font-bold text-text dark:text-text-dark group-hover:text-primary dark:group-hover:text-primary-light transition-colors">
+              <h3 className="font-bold" style={{ color: 'var(--color-text-heading)' }}>
                 {article.title}
               </h3>
-              <p className="mt-2 text-sm text-text-light dark:text-text-dark-muted">
+              <p className="mt-2 text-sm" style={{ color: 'var(--color-text-secondary)' }}>
                 {article.description}
               </p>
-              <span className="inline-block mt-3 text-sm font-medium text-primary dark:text-primary-light group-hover:underline">
+              <span style={{ display: 'inline-block', marginTop: '0.75rem', fontSize: '0.875rem', fontWeight: 500, color: 'var(--color-brand)' }}>
                 Read Guide →
               </span>
             </Link>

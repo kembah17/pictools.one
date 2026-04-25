@@ -43,7 +43,6 @@ export default function Header() {
                 href={`/${tool.slug}`}
                 className="px-3 py-2 text-sm font-medium text-text dark:text-text-dark hover:text-primary dark:hover:text-primary-light rounded-md hover:bg-surface-alt dark:hover:bg-surface-dark-alt transition-colors"
               >
-                <span className="mr-1">{tool.icon}</span>
                 {tool.name}
               </Link>
             ))}
