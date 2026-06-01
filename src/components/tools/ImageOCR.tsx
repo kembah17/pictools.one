@@ -10,6 +10,7 @@ import {
   type PreprocessingOptions,
   defaultPreprocessingOptions,
 } from "./ImagePreprocessor";
+import { useDeviceTier, formatFileSize as formatSize } from "@/hooks/useDeviceTier";
 
 interface OcrResult {
   text: string;
@@ -30,6 +31,7 @@ const LANGUAGES = [
 ];
 
 export default function ImageOCR() {
+  const deviceConfig = useDeviceTier();
   const [file, setFile] = useState<File | null>(null);
   const [imageUrl, setImageUrl] = useState("");
   const [language, setLanguage] = useState("eng");
@@ -39,25 +41,71 @@ export default function ImageOCR() {
   const [processing, setProcessing] = useState(false);
   const [progress, setProgress] = useState(0);
   const [progressLabel, setProgressLabel] = useState("");
+  const [progressPhase, setProgressPhase] = useState<"download" | "ocr" | "">("" );
+  const [startTime, setStartTime] = useState<number | null>(null);
+  const [eta, setEta] = useState<string | null>(null);
   const [result, setResult] = useState<OcrResult | null>(null);
   const [editedText, setEditedText] = useState("");
   const [copied, setCopied] = useState(false);
   const [skewAngle, setSkewAngle] = useState<number | null>(null);
   const [error, setError] = useState("");
+  const [fileSizeError, setFileSizeError] = useState("");
+  const [showWarning, setShowWarning] = useState(false);
 
   const originalCanvasRef = useRef<HTMLCanvasElement>(null);
   const previewCanvasRef = useRef<HTMLCanvasElement>(null);
   const sourceCanvasRef = useRef<HTMLCanvasElement | null>(null);
+  const abortRef = useRef(false);
+  const workerRef = useRef<Awaited<ReturnType<typeof createWorker>> | null>(null);
+
+  // Calculate ETA based on progress
+  useEffect(() => {
+    if (startTime && progress > 5 && progress < 100) {
+      const elapsed = Date.now() - startTime;
+      const estimated = (elapsed / progress) * (100 - progress);
+      const seconds = Math.ceil(estimated / 1000);
+      if (seconds > 2) {
+        setEta(seconds > 60 ? `~${Math.ceil(seconds / 60)} min remaining` : `~${seconds}s remaining`);
+      } else {
+        setEta(null);
+      }
+    } else {
+      setEta(null);
+    }
+  }, [progress, startTime]);
+
+  const compressImage = async (canvas: HTMLCanvasElement, maxDim: number): Promise<HTMLCanvasElement> => {
+    const { width, height } = canvas;
+    if (width <= maxDim && height <= maxDim) return canvas;
+    const scale = maxDim / Math.max(width, height);
+    const newCanvas = document.createElement("canvas");
+    newCanvas.width = Math.round(width * scale);
+    newCanvas.height = Math.round(height * scale);
+    const ctx = newCanvas.getContext("2d")!;
+    ctx.drawImage(canvas, 0, 0, newCanvas.width, newCanvas.height);
+    return newCanvas;
+  };
 
   const handleFiles = useCallback(async (files: File[]) => {
     const f = files[0];
     if (!f) return;
+
+    // File size validation
+    if (f.size > deviceConfig.maxFileSize) {
+      setFileSizeError(
+        `File too large (${formatSize(f.size)}). Maximum for your device: ${formatSize(deviceConfig.maxFileSize)}. Try a smaller file or use a desktop computer.`
+      );
+      return;
+    }
+
+    setFileSizeError("");
     setFile(f);
     setResult(null);
     setEditedText("");
     setError("");
     setSkewAngle(null);
     setProgress(0);
+    setShowWarning(false);
 
     try {
       const url = await fileToDataUrl(f);
@@ -86,7 +134,7 @@ export default function ImageOCR() {
     } catch {
       setError("Failed to load image. Please try a different file.");
     }
-  }, []);
+  }, [deviceConfig.maxFileSize]);
 
   const updatePreview = useCallback(
     (canvas: HTMLCanvasElement, opts: PreprocessingOptions) => {
@@ -109,7 +157,6 @@ export default function ImageOCR() {
       const pctx = pc.getContext("2d")!;
       pctx.drawImage(processed, 0, 0);
 
-      // Detect skew angle if deskew is enabled
       if (opts.deskew) {
         const imgData = canvas
           .getContext("2d")!
@@ -128,7 +175,6 @@ export default function ImageOCR() {
       setPreprocessing((prev) => {
         const next = { ...prev, [key]: value };
         if (sourceCanvasRef.current) {
-          // Debounce preview updates for sliders
           requestAnimationFrame(() => {
             if (sourceCanvasRef.current) {
               updatePreview(sourceCanvasRef.current, next);
@@ -141,20 +187,39 @@ export default function ImageOCR() {
     [updatePreview]
   );
 
-  // Update preview when preprocessing changes
   useEffect(() => {
     if (sourceCanvasRef.current) {
       updatePreview(sourceCanvasRef.current, preprocessing);
     }
   }, [preprocessing, updatePreview]);
 
+  const cancelProcessing = useCallback(() => {
+    abortRef.current = true;
+    if (workerRef.current) {
+      workerRef.current.terminate();
+      workerRef.current = null;
+    }
+    setProcessing(false);
+    setProgress(0);
+    setProgressLabel("");
+    setProgressPhase("");
+    setEta(null);
+    setStartTime(null);
+  }, []);
+
   const extractText = async () => {
     if (!sourceCanvasRef.current) return;
+
+    // Show warning before processing
+    setShowWarning(true);
     setProcessing(true);
     setProgress(0);
-    setProgressLabel("Initializing OCR engine...");
+    setProgressPhase("download");
+    setProgressLabel("Downloading OCR engine...");
     setError("");
     setResult(null);
+    setStartTime(Date.now());
+    abortRef.current = false;
 
     try {
       const hasAnyPreprocessing =
@@ -164,26 +229,46 @@ export default function ImageOCR() {
         preprocessing.deskew ||
         preprocessing.binarize;
 
-      const processedCanvas = hasAnyPreprocessing
+      let processedCanvas = hasAnyPreprocessing
         ? applyPreprocessing(sourceCanvasRef.current, preprocessing)
         : sourceCanvasRef.current;
 
-      // Create worker with proper v7 API
+      // Auto-compress on mobile
+      if (deviceConfig.autoCompress) {
+        processedCanvas = await compressImage(processedCanvas, 2000);
+      }
+
+      if (abortRef.current) return;
+
+      // Create worker with progress tracking
       const worker = await createWorker(language, 1, {
         logger: (m) => {
+          if (abortRef.current) return;
           if (m.status === "recognizing text") {
-            setProgress(m.progress * 100);
+            setProgressPhase("ocr");
+            setProgress(50 + m.progress * 50);
             setProgressLabel("Recognizing text...");
           } else if (m.status === "loading language traineddata") {
-            setProgress(m.progress * 100);
-            setProgressLabel("Loading language data...");
+            setProgressPhase("download");
+            setProgress(m.progress * 40);
+            setProgressLabel("Downloading language data...");
+          } else if (m.status === "initializing api") {
+            setProgress(45);
+            setProgressLabel("Initializing OCR engine...");
           } else {
             setProgressLabel(m.status || "Processing...");
           }
         },
       });
 
-      // Convert canvas to Blob for reliable input (avoids silent failures with raw canvas)
+      workerRef.current = worker;
+
+      if (abortRef.current) {
+        await worker.terminate();
+        return;
+      }
+
+      // Convert canvas to Blob
       const blob = await new Promise<Blob>((resolve, reject) => {
         processedCanvas.toBlob(
           (b) => (b ? resolve(b) : reject(new Error("Canvas toBlob failed"))),
@@ -191,8 +276,16 @@ export default function ImageOCR() {
         );
       });
 
+      if (abortRef.current) {
+        await worker.terminate();
+        return;
+      }
+
       const recognizeResult = await worker.recognize(blob);
       await worker.terminate();
+      workerRef.current = null;
+
+      if (abortRef.current) return;
 
       const text = recognizeResult.data.text.trim();
       const confidence = recognizeResult.data.confidence;
@@ -211,12 +304,17 @@ export default function ImageOCR() {
       setEditedText(text);
       setProgress(100);
       setProgressLabel("Complete!");
+      setProgressPhase("");
     } catch (err) {
-      setError(
-        `OCR failed: ${err instanceof Error ? err.message : "Unknown error"}. Please try again.`
-      );
+      if (!abortRef.current) {
+        setError(
+          `OCR failed: ${err instanceof Error ? err.message : "Unknown error"}. Please try again.`
+        );
+      }
     } finally {
       setProcessing(false);
+      setStartTime(null);
+      setEta(null);
     }
   };
 
@@ -252,15 +350,19 @@ export default function ImageOCR() {
   };
 
   const reset = () => {
+    cancelProcessing();
     setFile(null);
     setImageUrl("");
     setResult(null);
     setEditedText("");
     setError("");
+    setFileSizeError("");
     setProgress(0);
     setProgressLabel("");
+    setProgressPhase("");
     setSkewAngle(null);
     setPreprocessing(defaultPreprocessingOptions);
+    setShowWarning(false);
     sourceCanvasRef.current = null;
   };
 
@@ -273,13 +375,24 @@ export default function ImageOCR() {
   // No file uploaded yet
   if (!file) {
     return (
-      <DropZone
-        onFiles={handleFiles}
-        accept="image/jpeg,image/png,image/webp,image/bmp,image/tiff"
-        multiple={false}
-        label="Drop your image here for OCR"
-        sublabel="or click to browse — JPG, PNG, WebP, BMP, TIFF"
-      />
+      <div className="space-y-4">
+        {fileSizeError && (
+          <div className="p-4 rounded-lg bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 text-red-700 dark:text-red-300 text-sm">
+            ⚠️ {fileSizeError}
+          </div>
+        )}
+        <DropZone
+          onFiles={handleFiles}
+          accept="image/jpeg,image/png,image/webp,image/bmp,image/tiff"
+          multiple={false}
+          label="Drop your image here for OCR"
+          sublabel={`or click to browse — JPG, PNG, WebP, BMP, TIFF (max ${formatSize(deviceConfig.maxFileSize)})`}
+        />
+        {/* Device tier info */}
+        <div className="text-center text-xs text-text-light dark:text-text-dark-muted">
+          📱 Detected: {deviceConfig.tier} · Max file size: {formatSize(deviceConfig.maxFileSize)}
+        </div>
+      </div>
     );
   }
 
@@ -300,7 +413,6 @@ export default function ImageOCR() {
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          {/* Original */}
           <div>
             <p className="text-sm font-medium text-text-light dark:text-text-dark-muted mb-2">
               Original
@@ -312,8 +424,6 @@ export default function ImageOCR() {
               />
             </div>
           </div>
-
-          {/* Processed Preview */}
           <div>
             <p className="text-sm font-medium text-text-light dark:text-text-dark-muted mb-2">
               Processed Preview
@@ -339,10 +449,10 @@ export default function ImageOCR() {
         </h2>
         <p className="text-sm text-text-light dark:text-text-dark-muted mb-4">
           Improve OCR accuracy by enabling image preprocessing filters.
+          {deviceConfig.tier === "mobile" && " (Limited options on mobile for faster processing)"}
         </p>
 
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-          {/* Grayscale */}
           <label className="flex items-center gap-3 p-3 rounded-lg border border-border dark:border-border-dark hover:bg-surface-alt dark:hover:bg-surface-dark transition-colors cursor-pointer">
             <input
               type="checkbox"
@@ -362,7 +472,6 @@ export default function ImageOCR() {
             </div>
           </label>
 
-          {/* Noise Removal */}
           <label className="flex items-center gap-3 p-3 rounded-lg border border-border dark:border-border-dark hover:bg-surface-alt dark:hover:bg-surface-dark transition-colors cursor-pointer">
             <input
               type="checkbox"
@@ -382,32 +491,32 @@ export default function ImageOCR() {
             </div>
           </label>
 
-          {/* Deskew */}
-          <label className="flex items-center gap-3 p-3 rounded-lg border border-border dark:border-border-dark hover:bg-surface-alt dark:hover:bg-surface-dark transition-colors cursor-pointer">
-            <input
-              type="checkbox"
-              checked={preprocessing.deskew}
-              onChange={(e) =>
-                handlePreprocessingChange("deskew", e.target.checked)
-              }
-              className="w-4 h-4 rounded accent-primary"
-            />
-            <div>
-              <span className="text-sm font-medium text-text dark:text-text-dark">
-                Deskew Detection
-              </span>
-              <p className="text-xs text-text-light dark:text-text-dark-muted">
-                Auto-correct tilted text
-                {skewAngle !== null && (
-                  <span className="ml-1 text-primary dark:text-primary-light font-medium">
-                    (detected: {skewAngle.toFixed(1)}°)
-                  </span>
-                )}
-              </p>
-            </div>
-          </label>
+          {deviceConfig.preprocessingLevel !== "minimal" && (
+            <label className="flex items-center gap-3 p-3 rounded-lg border border-border dark:border-border-dark hover:bg-surface-alt dark:hover:bg-surface-dark transition-colors cursor-pointer">
+              <input
+                type="checkbox"
+                checked={preprocessing.deskew}
+                onChange={(e) =>
+                  handlePreprocessingChange("deskew", e.target.checked)
+                }
+                className="w-4 h-4 rounded accent-primary"
+              />
+              <div>
+                <span className="text-sm font-medium text-text dark:text-text-dark">
+                  Deskew Detection
+                </span>
+                <p className="text-xs text-text-light dark:text-text-dark-muted">
+                  Auto-correct tilted text
+                  {skewAngle !== null && (
+                    <span className="ml-1 text-primary dark:text-primary-light font-medium">
+                      (detected: {skewAngle.toFixed(1)}°)
+                    </span>
+                  )}
+                </p>
+              </div>
+            </label>
+          )}
 
-          {/* Contrast Enhancement */}
           <div className="p-3 rounded-lg border border-border dark:border-border-dark">
             <label className="flex items-center gap-3 cursor-pointer">
               <input
@@ -454,52 +563,53 @@ export default function ImageOCR() {
             )}
           </div>
 
-          {/* Binarize */}
-          <div className="p-3 rounded-lg border border-border dark:border-border-dark sm:col-span-2">
-            <label className="flex items-center gap-3 cursor-pointer">
-              <input
-                type="checkbox"
-                checked={preprocessing.binarize}
-                onChange={(e) =>
-                  handlePreprocessingChange("binarize", e.target.checked)
-                }
-                className="w-4 h-4 rounded accent-primary"
-              />
-              <div>
-                <span className="text-sm font-medium text-text dark:text-text-dark">
-                  Threshold / Binarize
-                </span>
-                <p className="text-xs text-text-light dark:text-text-dark-muted">
-                  Convert to pure black and white
-                </p>
-              </div>
-            </label>
-            {preprocessing.binarize && (
-              <div className="mt-3 ml-7">
-                <div className="flex items-center justify-between mb-1">
-                  <span className="text-xs text-text-light dark:text-text-dark-muted">
-                    Threshold
-                  </span>
-                  <span className="text-xs font-medium text-text dark:text-text-dark">
-                    {preprocessing.binarizeThreshold}
-                  </span>
-                </div>
+          {deviceConfig.preprocessingLevel === "full" && (
+            <div className="p-3 rounded-lg border border-border dark:border-border-dark sm:col-span-2">
+              <label className="flex items-center gap-3 cursor-pointer">
                 <input
-                  type="range"
-                  min={0}
-                  max={255}
-                  value={preprocessing.binarizeThreshold}
+                  type="checkbox"
+                  checked={preprocessing.binarize}
                   onChange={(e) =>
-                    handlePreprocessingChange(
-                      "binarizeThreshold",
-                      Number(e.target.value)
-                    )
+                    handlePreprocessingChange("binarize", e.target.checked)
                   }
-                  className="w-full h-2 rounded-lg appearance-none cursor-pointer accent-primary"
+                  className="w-4 h-4 rounded accent-primary"
                 />
-              </div>
-            )}
-          </div>
+                <div>
+                  <span className="text-sm font-medium text-text dark:text-text-dark">
+                    Threshold / Binarize
+                  </span>
+                  <p className="text-xs text-text-light dark:text-text-dark-muted">
+                    Convert to pure black and white
+                  </p>
+                </div>
+              </label>
+              {preprocessing.binarize && (
+                <div className="mt-3 ml-7">
+                  <div className="flex items-center justify-between mb-1">
+                    <span className="text-xs text-text-light dark:text-text-dark-muted">
+                      Threshold
+                    </span>
+                    <span className="text-xs font-medium text-text dark:text-text-dark">
+                      {preprocessing.binarizeThreshold}
+                    </span>
+                  </div>
+                  <input
+                    type="range"
+                    min={0}
+                    max={255}
+                    value={preprocessing.binarizeThreshold}
+                    onChange={(e) =>
+                      handlePreprocessingChange(
+                        "binarizeThreshold",
+                        Number(e.target.value)
+                      )
+                    }
+                    className="w-full h-2 rounded-lg appearance-none cursor-pointer accent-primary"
+                  />
+                </div>
+              )}
+            </div>
+          )}
         </div>
       </div>
 
@@ -533,6 +643,17 @@ export default function ImageOCR() {
           </button>
         </div>
 
+        {/* Processing Warning */}
+        {showWarning && processing && (
+          <div className={`mt-4 p-3 rounded-lg text-sm ${
+            deviceConfig.tier === "mobile"
+              ? "bg-orange-50 dark:bg-orange-900/20 border border-orange-200 dark:border-orange-800 text-orange-700 dark:text-orange-300"
+              : "bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 text-blue-700 dark:text-blue-300"
+          }`}>
+            ⏱️ {deviceConfig.warning}
+          </div>
+        )}
+
         {/* Progress */}
         {processing && (
           <div className="mt-4">
@@ -541,6 +662,34 @@ export default function ImageOCR() {
               label={progressLabel}
               showPercent
             />
+            {/* Phase indicator */}
+            <div className="flex items-center justify-between mt-2">
+              <div className="flex items-center gap-2">
+                {progressPhase === "download" && (
+                  <span className="text-xs text-blue-600 dark:text-blue-400 font-medium">
+                    📥 Downloading WASM engine...
+                  </span>
+                )}
+                {progressPhase === "ocr" && (
+                  <span className="text-xs text-green-600 dark:text-green-400 font-medium">
+                    🔍 Running OCR...
+                  </span>
+                )}
+              </div>
+              <div className="flex items-center gap-3">
+                {eta && (
+                  <span className="text-xs text-text-light dark:text-text-dark-muted">
+                    {eta}
+                  </span>
+                )}
+                <button
+                  onClick={cancelProcessing}
+                  className="px-3 py-1 text-xs font-medium rounded-md bg-red-100 dark:bg-red-900/30 text-red-600 dark:text-red-400 hover:bg-red-200 dark:hover:bg-red-900/50 transition-colors"
+                >
+                  ✕ Cancel
+                </button>
+              </div>
+            </div>
           </div>
         )}
 
@@ -575,7 +724,6 @@ export default function ImageOCR() {
             </div>
           </div>
 
-          {/* Stats */}
           <div className="grid grid-cols-3 gap-3 mb-4">
             <div className="text-center p-3 rounded-lg bg-surface-alt dark:bg-surface-dark border border-border/50 dark:border-border-dark/50">
               <p className="text-xs text-text-light dark:text-text-dark-muted">
@@ -605,7 +753,6 @@ export default function ImageOCR() {
             </div>
           </div>
 
-          {/* Editable Text Area */}
           <textarea
             value={editedText}
             onChange={(e) => setEditedText(e.target.value)}
