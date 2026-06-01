@@ -26,6 +26,8 @@ export const metadata: Metadata = {
     index: true,
     follow: true,
   },
+
+  alternates: { canonical: 'https://pictools.one' },
 };
 
 export default function RootLayout({
