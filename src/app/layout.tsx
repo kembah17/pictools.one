@@ -20,6 +20,7 @@ export const metadata: Metadata = {
     type: "website",
     locale: "en_US",
     siteName: "PicTools.one",
+    images: [{ url: '/og-image.png', width: 1200, height: 630, alt: 'Pic Tools' }],
   },
   robots: {
     index: true,
@@ -42,6 +43,18 @@ export default function RootLayout({
         <script
           dangerouslySetInnerHTML={{
             __html: `(function(){try{var t=localStorage.getItem("theme");if(t==="dark"||(!t&&window.matchMedia("(prefers-color-scheme:dark)").matches)){document.documentElement.classList.add("dark")}}catch(e){}})()`
+          }}
+        />
+        <script
+          type="application/ld+json"
+          dangerouslySetInnerHTML={{
+            __html: JSON.stringify({
+              "@context": "https://schema.org",
+              "@type": "WebSite",
+              "name": "PicTools.one",
+              "url": "https://pictools.one",
+              "description": "Free online image tools: resize, compress, crop, convert, and bulk process images. 100% client-side — your files never leave your device."
+            })
           }}
         />
       </head>
