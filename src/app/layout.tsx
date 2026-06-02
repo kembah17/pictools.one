@@ -15,7 +15,7 @@ export const metadata: Metadata = {
   },
   description:
     "Free online image tools: resize, compress, crop, convert, and bulk process images. 100% client-side — your files never leave your device.",
-  metadataBase: new URL("https://pictools.one"),
+  metadataBase: new URL("https://www.pictools.one"),
   openGraph: {
     type: "website",
     locale: "en_US",
@@ -27,7 +27,7 @@ export const metadata: Metadata = {
     follow: true,
   },
 
-  alternates: { canonical: 'https://pictools.one' },
+  alternates: { canonical: 'https://www.pictools.one' },
 };
 
 export default function RootLayout({
@@ -54,7 +54,7 @@ export default function RootLayout({
               "@context": "https://schema.org",
               "@type": "WebSite",
               "name": "PicTools.one",
-              "url": "https://pictools.one",
+              "url": "https://www.pictools.one",
               "description": "Free online image tools: resize, compress, crop, convert, and bulk process images. 100% client-side — your files never leave your device."
             })
           }}

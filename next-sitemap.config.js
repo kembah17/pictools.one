@@ -1,6 +1,6 @@
 /** @type {import('next-sitemap').IConfig} */
 module.exports = {
-  siteUrl: 'https://pictools.one',
+  siteUrl: 'https://www.pictools.one',
   generateRobotsTxt: true,
   generateIndexSitemap: false,
   outDir: './out',

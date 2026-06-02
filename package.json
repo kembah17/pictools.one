@@ -4,9 +4,8 @@
   "private": true,
   "scripts": {
     "dev": "next dev",
-    "build": "next build",
-    "start": "next start",
-    "postbuild": "next-sitemap"
+    "build": "next build && next-sitemap",
+    "start": "next start"
   },
   "dependencies": {
     "browser-image-compression": "^2.0.2",

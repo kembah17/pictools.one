@@ -15,7 +15,7 @@ export default function BreadcrumbSchema({ items }: BreadcrumbSchemaProps) {
       "@type": "ListItem",
       position: i + 1,
       name: item.name,
-      item: `https://pictools.one${item.href}`,
+      item: `https://www.pictools.one${item.href}`,
     })),
   };
 

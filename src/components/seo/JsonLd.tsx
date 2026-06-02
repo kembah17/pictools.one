@@ -10,7 +10,7 @@ export default function JsonLd({ name, description, url }: JsonLdProps) {
     "@type": "WebApplication",
     name,
     description,
-    url: `https://pictools.one${url}`,
+    url: `https://www.pictools.one${url}`,
     applicationCategory: "MultimediaApplication",
     operatingSystem: "Any",
     offers: {
