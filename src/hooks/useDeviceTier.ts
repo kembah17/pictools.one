@@ -7,6 +7,7 @@ export interface DeviceTierConfig {
   tier: DeviceTier;
   maxFileSize: number; // bytes
   maxTotalSize: number; // bytes
+  maxImageDim: number; // max pixel dimension for OCR processing
   preprocessingLevel: "full" | "basic" | "minimal";
   warning: string;
   autoCompress: boolean;
@@ -16,6 +17,7 @@ const CONFIGS: Record<DeviceTier, Omit<DeviceTierConfig, "tier">> = {
   desktop: {
     maxFileSize: 20 * 1024 * 1024, // 20MB
     maxTotalSize: 100 * 1024 * 1024, // 100MB
+    maxImageDim: 4000, // Cap at 4000px to prevent processing unnecessarily huge images
     preprocessingLevel: "full",
     warning: "Processing may take 10-30 seconds for large files.",
     autoCompress: false,
@@ -23,6 +25,7 @@ const CONFIGS: Record<DeviceTier, Omit<DeviceTierConfig, "tier">> = {
   tablet: {
     maxFileSize: 10 * 1024 * 1024, // 10MB
     maxTotalSize: 50 * 1024 * 1024, // 50MB
+    maxImageDim: 2000, // 2000px max for tablet
     preprocessingLevel: "basic",
     warning: "Processing may take 30-60 seconds. Keep this tab active.",
     autoCompress: false,
@@ -30,6 +33,7 @@ const CONFIGS: Record<DeviceTier, Omit<DeviceTierConfig, "tier">> = {
   mobile: {
     maxFileSize: 5 * 1024 * 1024, // 5MB
     maxTotalSize: 20 * 1024 * 1024, // 20MB
+    maxImageDim: 1500, // 1500px max for mobile (was 2000, reduced to prevent hanging)
     preprocessingLevel: "minimal",
     warning:
       "Processing may take 1-2 minutes on mobile. Keep screen on and tab active. Consider using desktop for large files.",

@@ -34,6 +34,7 @@ export default function ImageOCR() {
   const deviceConfig = useDeviceTier();
   const [file, setFile] = useState<File | null>(null);
   const [imageUrl, setImageUrl] = useState("");
+  const [imageDimensions, setImageDimensions] = useState<{ width: number; height: number } | null>(null);
   const [language, setLanguage] = useState("eng");
   const [preprocessing, setPreprocessing] = useState<PreprocessingOptions>(
     defaultPreprocessingOptions
@@ -112,6 +113,9 @@ export default function ImageOCR() {
       setImageUrl(url);
       const img = await loadImage(url);
 
+      // Store image dimensions
+      setImageDimensions({ width: img.naturalWidth, height: img.naturalHeight });
+
       // Draw original to canvas
       const canvas = document.createElement("canvas");
       canvas.width = img.naturalWidth;
@@ -144,6 +148,7 @@ export default function ImageOCR() {
         opts.grayscale ||
         opts.contrast ||
         opts.noiseRemoval ||
+        opts.sharpen ||
         opts.deskew ||
         opts.binarize;
 
@@ -226,6 +231,7 @@ export default function ImageOCR() {
         preprocessing.grayscale ||
         preprocessing.contrast ||
         preprocessing.noiseRemoval ||
+        preprocessing.sharpen ||
         preprocessing.deskew ||
         preprocessing.binarize;
 
@@ -233,10 +239,15 @@ export default function ImageOCR() {
         ? applyPreprocessing(sourceCanvasRef.current, preprocessing)
         : sourceCanvasRef.current;
 
-      // Auto-compress on mobile
-      if (deviceConfig.autoCompress) {
-        processedCanvas = await compressImage(processedCanvas, 2000);
-      }
+      // Auto-compress based on device tier
+      // Mobile: 1500px max, Tablet: 2000px max, Desktop: 4000px max
+      const maxDimByTier = {
+        mobile: 1500,
+        tablet: 2000,
+        desktop: 4000,
+      };
+      const maxDim = maxDimByTier[deviceConfig.tier];
+      processedCanvas = await compressImage(processedCanvas, maxDim);
 
       if (abortRef.current) return;
 
@@ -353,6 +364,7 @@ export default function ImageOCR() {
     cancelProcessing();
     setFile(null);
     setImageUrl("");
+    setImageDimensions(null);
     setResult(null);
     setEditedText("");
     setError("");
@@ -378,7 +390,7 @@ export default function ImageOCR() {
       <div className="space-y-4">
         {fileSizeError && (
           <div className="p-4 rounded-lg bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 text-red-700 dark:text-red-300 text-sm">
-            ⚠️ {fileSizeError}
+            \u26a0\ufe0f {fileSizeError}
           </div>
         )}
         <DropZone
@@ -386,11 +398,11 @@ export default function ImageOCR() {
           accept="image/jpeg,image/png,image/webp,image/bmp,image/tiff"
           multiple={false}
           label="Drop your image here for OCR"
-          sublabel={`or click to browse — JPG, PNG, WebP, BMP, TIFF (max ${formatSize(deviceConfig.maxFileSize)})`}
+          sublabel={`or click to browse \u2014 JPG, PNG, WebP, BMP, TIFF (max ${formatSize(deviceConfig.maxFileSize)})`}
         />
         {/* Device tier info */}
         <div className="text-center text-xs text-text-light dark:text-text-dark-muted">
-          📱 Detected: {deviceConfig.tier} · Max file size: {formatSize(deviceConfig.maxFileSize)}
+          \ud83d\udcf1 Detected: {deviceConfig.tier} \u00b7 Max file size: {formatSize(deviceConfig.maxFileSize)}
         </div>
       </div>
     );
@@ -408,7 +420,7 @@ export default function ImageOCR() {
             onClick={reset}
             className="px-4 py-2 text-sm font-medium rounded-lg border border-border dark:border-border-dark text-text-light dark:text-text-dark-muted hover:bg-surface-alt dark:hover:bg-surface-dark transition-colors"
           >
-            ✕ Reset
+            \u2715 Reset
           </button>
         </div>
 
@@ -438,14 +450,17 @@ export default function ImageOCR() {
         </div>
 
         <p className="mt-3 text-sm text-text-light dark:text-text-dark-muted">
-          📄 {file.name} — {(file.size / 1024).toFixed(1)} KB
+          \ud83d\udcc4 {file.name} \u2014 {(file.size / 1024).toFixed(1)} KB
+          {imageDimensions && (
+            <span className="ml-2">\u00b7 {imageDimensions.width} \u00d7 {imageDimensions.height}px</span>
+          )}
         </p>
       </div>
 
       {/* Preprocessing Panel */}
       <div className="bg-surface dark:bg-surface-dark-alt border border-border dark:border-border-dark rounded-xl p-4 sm:p-6">
         <h2 className="text-lg font-semibold text-text dark:text-text-dark mb-4">
-          🔧 Preprocessing Options
+          \ud83d\udd27 Preprocessing Options
         </h2>
         <p className="text-sm text-text-light dark:text-text-dark-muted mb-4">
           Improve OCR accuracy by enabling image preprocessing filters.
@@ -491,6 +506,26 @@ export default function ImageOCR() {
             </div>
           </label>
 
+          {/* Sharpen - available on all tiers */}
+          <label className="flex items-center gap-3 p-3 rounded-lg border border-border dark:border-border-dark hover:bg-surface-alt dark:hover:bg-surface-dark transition-colors cursor-pointer">
+            <input
+              type="checkbox"
+              checked={preprocessing.sharpen}
+              onChange={(e) =>
+                handlePreprocessingChange("sharpen", e.target.checked)
+              }
+              className="w-4 h-4 rounded accent-primary"
+            />
+            <div>
+              <span className="text-sm font-medium text-text dark:text-text-dark">
+                Sharpen Text
+              </span>
+              <p className="text-xs text-text-light dark:text-text-dark-muted">
+                Enhance text edges for better recognition
+              </p>
+            </div>
+          </label>
+
           {deviceConfig.preprocessingLevel !== "minimal" && (
             <label className="flex items-center gap-3 p-3 rounded-lg border border-border dark:border-border-dark hover:bg-surface-alt dark:hover:bg-surface-dark transition-colors cursor-pointer">
               <input
@@ -509,7 +544,7 @@ export default function ImageOCR() {
                   Auto-correct tilted text
                   {skewAngle !== null && (
                     <span className="ml-1 text-primary dark:text-primary-light font-medium">
-                      (detected: {skewAngle.toFixed(1)}°)
+                      (detected: {skewAngle.toFixed(1)}\u00b0)
                     </span>
                   )}
                 </p>
@@ -590,22 +625,39 @@ export default function ImageOCR() {
                       Threshold
                     </span>
                     <span className="text-xs font-medium text-text dark:text-text-dark">
-                      {preprocessing.binarizeThreshold}
+                      {preprocessing.binarizeThreshold < 0 ? "Auto (Otsu\u2019s)" : preprocessing.binarizeThreshold}
                     </span>
                   </div>
-                  <input
-                    type="range"
-                    min={0}
-                    max={255}
-                    value={preprocessing.binarizeThreshold}
-                    onChange={(e) =>
-                      handlePreprocessingChange(
-                        "binarizeThreshold",
-                        Number(e.target.value)
-                      )
-                    }
-                    className="w-full h-2 rounded-lg appearance-none cursor-pointer accent-primary"
-                  />
+                  <div className="flex items-center gap-3">
+                    <input
+                      type="range"
+                      min={0}
+                      max={255}
+                      value={preprocessing.binarizeThreshold < 0 ? 128 : preprocessing.binarizeThreshold}
+                      onChange={(e) =>
+                        handlePreprocessingChange(
+                          "binarizeThreshold",
+                          Number(e.target.value)
+                        )
+                      }
+                      className="flex-1 h-2 rounded-lg appearance-none cursor-pointer accent-primary"
+                    />
+                    <button
+                      onClick={() => handlePreprocessingChange("binarizeThreshold", -1)}
+                      className={`px-2 py-1 text-xs font-medium rounded-md transition-colors ${
+                        preprocessing.binarizeThreshold < 0
+                          ? "bg-primary text-surface"
+                          : "bg-surface-alt dark:bg-surface-dark border border-border dark:border-border-dark text-text-light dark:text-text-dark-muted hover:bg-primary/10"
+                      }`}
+                    >
+                      Auto
+                    </button>
+                  </div>
+                  {preprocessing.binarizeThreshold < 0 && (
+                    <p className="mt-1 text-xs text-primary dark:text-primary-light">
+                      Using Otsu\u2019s adaptive thresholding \u2014 automatically finds the best threshold for your image
+                    </p>
+                  )}
                 </div>
               )}
             </div>
@@ -618,7 +670,7 @@ export default function ImageOCR() {
         <div className="flex flex-col sm:flex-row items-start sm:items-center gap-4">
           <div className="flex-1">
             <label className="block text-sm font-medium text-text dark:text-text-dark mb-1">
-              🌐 Language
+              \ud83c\udf10 Language
             </label>
             <select
               value={language}
@@ -639,7 +691,7 @@ export default function ImageOCR() {
             disabled={processing}
             className="px-6 py-2.5 rounded-lg font-semibold text-sm bg-primary hover:bg-primary-dark text-surface transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
           >
-            {processing ? "Extracting..." : "📝 Extract Text"}
+            {processing ? "Extracting..." : "\ud83d\udcdd Extract Text"}
           </button>
         </div>
 
@@ -650,7 +702,7 @@ export default function ImageOCR() {
               ? "bg-orange-50 dark:bg-orange-900/20 border border-orange-200 dark:border-orange-800 text-orange-700 dark:text-orange-300"
               : "bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 text-blue-700 dark:text-blue-300"
           }`}>
-            ⏱️ {deviceConfig.warning}
+            \u23f1\ufe0f {deviceConfig.warning}
           </div>
         )}
 
@@ -667,12 +719,12 @@ export default function ImageOCR() {
               <div className="flex items-center gap-2">
                 {progressPhase === "download" && (
                   <span className="text-xs text-blue-600 dark:text-blue-400 font-medium">
-                    📥 Downloading WASM engine...
+                    \ud83d\udce5 Downloading WASM engine...
                   </span>
                 )}
                 {progressPhase === "ocr" && (
                   <span className="text-xs text-green-600 dark:text-green-400 font-medium">
-                    🔍 Running OCR...
+                    \ud83d\udd0d Running OCR...
                   </span>
                 )}
               </div>
@@ -686,7 +738,7 @@ export default function ImageOCR() {
                   onClick={cancelProcessing}
                   className="px-3 py-1 text-xs font-medium rounded-md bg-red-100 dark:bg-red-900/30 text-red-600 dark:text-red-400 hover:bg-red-200 dark:hover:bg-red-900/50 transition-colors"
                 >
-                  ✕ Cancel
+                  \u2715 Cancel
                 </button>
               </div>
             </div>
@@ -706,20 +758,20 @@ export default function ImageOCR() {
         <div className="bg-surface dark:bg-surface-dark-alt border border-border dark:border-border-dark rounded-xl p-4 sm:p-6">
           <div className="flex items-center justify-between mb-4">
             <h2 className="text-lg font-semibold text-text dark:text-text-dark">
-              📄 Extracted Text
+              \ud83d\udcc4 Extracted Text
             </h2>
             <div className="flex items-center gap-3">
               <button
                 onClick={copyToClipboard}
                 className="px-4 py-2 text-sm font-medium rounded-lg bg-primary hover:bg-primary-dark text-surface transition-colors"
               >
-                {copied ? "✓ Copied!" : "📋 Copy"}
+                {copied ? "\u2713 Copied!" : "\ud83d\udccb Copy"}
               </button>
               <button
                 onClick={downloadText}
                 className="px-4 py-2 text-sm font-medium rounded-lg border border-border dark:border-border-dark text-text dark:text-text-dark hover:bg-surface-alt dark:hover:bg-surface-dark transition-colors"
               >
-                💾 Download .txt
+                \ud83d\udcbe Download .txt
               </button>
             </div>
           </div>
@@ -763,7 +815,7 @@ export default function ImageOCR() {
 
           {result.text.length === 0 && (
             <p className="mt-2 text-sm text-warning">
-              ⚠️ No text was detected in the image. Try enabling preprocessing
+              \u26a0\ufe0f No text was detected in the image. Try enabling preprocessing
               options like Grayscale, Contrast Enhancement, or Binarize for
               better results.
             </p>
