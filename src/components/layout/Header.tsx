@@ -32,7 +32,7 @@ export default function Header() {
         <div className="flex items-center justify-between h-16">
           <Link href="/" className="flex items-center gap-2 text-xl font-bold text-primary">
             <span className="text-2xl">🖼️</span>
-            <span>PicTools<span className="text-secondary">.one</span></span>
+            <span>PicTools<span className="text-primary dark:text-[var(--color-brand)]">.one</span></span>
           </Link>
 
           {/* Desktop Nav */}
