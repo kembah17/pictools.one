@@ -1,10 +1,11 @@
 "use client";
-import { useState, useCallback } from "react";
+import { useState, useCallback, useRef } from "react";
 import JSZip from "jszip";
 import { saveAs } from "file-saver";
 import DropZone from "@/components/ui/DropZone";
 import ProgressBar from "@/components/ui/ProgressBar";
 import { formatFileSize, loadImage, fileToDataUrl, canvasToBlob, MIME_TO_EXT } from "@/lib/utils";
+import { useDeviceTier } from "@/hooks/useDeviceTier";
 
 type ResizeMode = "exact" | "percentage" | "max";
 
@@ -19,7 +20,14 @@ interface ResizedFile {
   error?: string;
 }
 
+const BATCH_LIMITS: Record<string, number> = {
+  mobile: 10,
+  tablet: 20,
+  desktop: 50,
+};
+
 export default function BulkResize() {
+  const deviceConfig = useDeviceTier();
   const [files, setFiles] = useState<ResizedFile[]>([]);
   const [mode, setMode] = useState<ResizeMode>("exact");
   const [width, setWidth] = useState(800);
@@ -28,8 +36,26 @@ export default function BulkResize() {
   const [maxDim, setMaxDim] = useState(1920);
   const [processing, setProcessing] = useState(false);
   const [progress, setProgress] = useState(0);
+  const [batchWarning, setBatchWarning] = useState("");
+  const abortRef = useRef(false);
 
   const handleFiles = useCallback((newFiles: File[]) => {
+    const limit = BATCH_LIMITS[deviceConfig.tier] || 50;
+    const currentCount = files.length;
+    const totalAfterAdd = currentCount + newFiles.length;
+
+    if (totalAfterAdd > limit) {
+      const allowed = Math.max(0, limit - currentCount);
+      setBatchWarning(
+        `Your device (${deviceConfig.tier}) supports up to ${limit} images. ` +
+        `You already have ${currentCount}, so only ${allowed} of ${newFiles.length} new images were added.`
+      );
+      newFiles = newFiles.slice(0, allowed);
+      if (newFiles.length === 0) return;
+    } else {
+      setBatchWarning("");
+    }
+
     const items: ResizedFile[] = newFiles.map((f) => ({
       original: f,
       resized: null,
@@ -40,14 +66,38 @@ export default function BulkResize() {
       status: "pending",
     }));
     setFiles((prev) => [...prev, ...items]);
+  }, [files.length, deviceConfig.tier]);
+
+  const cancel = useCallback(() => {
+    abortRef.current = true;
   }, []);
 
   const resizeAll = async () => {
     setProcessing(true);
     setProgress(0);
+    abortRef.current = false;
     const updated = [...files];
 
+    // Show device tier warning when processing starts on mobile/tablet
+    if (deviceConfig.tier !== "desktop" && deviceConfig.warning) {
+      setBatchWarning(deviceConfig.warning);
+    }
+
     for (let i = 0; i < updated.length; i++) {
+      if (abortRef.current) {
+        abortRef.current = false;
+        // Reset any "processing" items back to "pending"
+        for (let j = i; j < updated.length; j++) {
+          if (updated[j].status === "processing") {
+            updated[j].status = "pending";
+          }
+        }
+        setFiles([...updated]);
+        setProcessing(false);
+        setBatchWarning("Processing cancelled.");
+        return;
+      }
+
       if (updated[i].status === "done") continue;
       updated[i].status = "processing";
       setFiles([...updated]);
@@ -115,18 +165,29 @@ export default function BulkResize() {
   const removeFile = (index: number) => {
     setFiles((prev) => {
       const updated = [...prev];
-      updated.splice(index, 1);
+      const removed = updated.splice(index, 1);
+      // Revoke any blob URLs if they exist
+      removed.forEach((item) => {
+        if (item.resized) {
+          // Resized blobs are raw Blobs, not URLs, so no revocation needed
+          // But if any preview URLs were created, they would be revoked here
+        }
+      });
       return updated;
     });
+    setBatchWarning("");
   };
 
   const reset = () => {
     setFiles([]);
     setProgress(0);
+    setBatchWarning("");
+    abortRef.current = false;
   };
 
   const allDone = files.length > 0 && files.every((f) => f.status === "done");
   const doneCount = files.filter((f) => f.status === "done").length;
+  const batchLimit = BATCH_LIMITS[deviceConfig.tier] || 50;
 
   return (
     <div className="space-y-6">
@@ -134,8 +195,15 @@ export default function BulkResize() {
         onFiles={handleFiles}
         multiple
         label="Drop multiple images here"
-        sublabel="or click to browse — batch resize supported"
+        sublabel={`or click to browse — batch resize supported (max ${batchLimit} on ${deviceConfig.tier})`}
       />
+
+      {/* Batch Warning */}
+      {batchWarning && (
+        <div className="p-3 rounded-lg bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 text-yellow-700 dark:text-yellow-300 text-sm">
+          ⚠️ {batchWarning}
+        </div>
+      )}
 
       {files.length > 0 && (
         <>
@@ -221,6 +289,14 @@ export default function BulkResize() {
               >
                 {processing ? "Resizing..." : `Resize All (${files.length} images)`}
               </button>
+              {processing && (
+                <button
+                  onClick={cancel}
+                  className="px-6 py-2.5 bg-red-100 dark:bg-red-900/30 text-red-600 dark:text-red-400 font-semibold rounded-lg hover:bg-red-200 dark:hover:bg-red-900/50 transition-colors"
+                >
+                  ✕ Cancel
+                </button>
+              )}
               {allDone && (
                 <button
                   onClick={downloadZip}
