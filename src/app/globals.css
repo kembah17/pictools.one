@@ -88,7 +88,7 @@
   --color-info-bg: #EFF6FF;
   --color-ad-bg: rgba(124,58,237,0.04);
   --color-ad-border: rgba(124,58,237,0.12);
-  --color-ad-text: #6B7280;
+  --color-ad-text: #64748B;
   --color-toggle-track: #CBD5E1;
   --color-toggle-thumb: #FFFFFF;
   --color-toggle-icon: #64748B;
@@ -134,10 +134,10 @@
   --color-text-inverse: #111827;
   --color-text-heading: #F8FAFC;
   --color-text-link: #C3A6F6;
-  --color-brand: #C3A6F6;
-  --color-primary: #C3A6F6;
-  --color-brand-dark: #7C3AED;
-  --color-brand-darker: #5E14DD;
+  --color-brand: #7C3AED;
+  --color-primary: #7C3AED;
+    --color-brand-dark: #6D28D9;
+    --color-brand-darker: #5B21B6;
   --color-brand-light: #F9F7FE;
   --color-brand-lighter: #FFFFFF;
   --color-brand-lightest: #1C0643;
@@ -160,7 +160,7 @@
   --color-info-bg: #1E3A5F;
   --color-ad-bg: rgba(195,166,246,0.06);
   --color-ad-border: rgba(195,166,246,0.15);
-  --color-ad-text: #94A3B8;
+  --color-ad-text: #CBD5E1;
   --color-toggle-track: #334155;
   --color-toggle-thumb: #F1F5F9;
   --color-toggle-icon: #94A3B8;
