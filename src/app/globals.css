@@ -66,7 +66,7 @@
   --color-brand: #7C3AED;
   --color-brand-dark: #5E14DD;
   --color-brand-darker: #4A10AF;
-  --color-brand-light: #C3A6F6;
+  --color-brand-light: #8B5CF6;
   --color-brand-lighter: #F9F7FE;
   --color-brand-lightest: #FFFFFF;
   --color-brand-bg: #FFFFFF;
@@ -88,7 +88,7 @@
   --color-info-bg: #EFF6FF;
   --color-ad-bg: rgba(124,58,237,0.04);
   --color-ad-border: rgba(124,58,237,0.12);
-  --color-ad-text: #64748B;
+  --color-ad-text: #475569;
   --color-toggle-track: #CBD5E1;
   --color-toggle-thumb: #FFFFFF;
   --color-toggle-icon: #64748B;
@@ -115,7 +115,7 @@
   --color-light: #FFFFFF;
   --color-dark: #FFFFFF;
   --color-dark-muted: #94A3B8;
-  --color-link: #C3A6F6;
+  --color-link: #A78BFA;
 
   --color-primary-text: #FFFFFF;
   --color-bg-primary: #0B1120;
@@ -133,19 +133,19 @@
   --color-text-muted: #94A3B8;
   --color-text-inverse: #111827;
   --color-text-heading: #F8FAFC;
-  --color-text-link: #C3A6F6;
-  --color-brand: #7C3AED;
+  --color-text-link: #A78BFA;
+  --color-brand: #A78BFA;
   --color-primary: #7C3AED;
-    --color-brand-dark: #6D28D9;
-    --color-brand-darker: #5B21B6;
-  --color-brand-light: #F9F7FE;
+    --color-brand-dark: #8B5CF6;
+    --color-brand-darker: #7C3AED;
+  --color-brand-light: #C4B5FD;
   --color-brand-lighter: #FFFFFF;
   --color-brand-lightest: #1C0643;
   --color-brand-bg: #1C0643;
   --color-border: #475569;
   --color-border-light: #1E2D42;
   --color-border-dark: #3D5068;
-  --color-border-brand: #7C3AED;
+  --color-border-brand: #A78BFA;
   --shadow-sm: 0 1px 3px 0 rgba(0,0,0,0.4), 0 1px 2px -1px rgba(0,0,0,0.3);
   --shadow-md: 0 4px 8px -1px rgba(0,0,0,0.5), 0 2px 4px -2px rgba(0,0,0,0.4);
   --shadow-lg: 0 12px 24px -4px rgba(0,0,0,0.5), 0 4px 8px -4px rgba(0,0,0,0.4);
@@ -160,7 +160,7 @@
   --color-info-bg: #1E3A5F;
   --color-ad-bg: rgba(195,166,246,0.06);
   --color-ad-border: rgba(195,166,246,0.15);
-  --color-ad-text: #CBD5E1;
+  --color-ad-text: #94A3B8;
   --color-toggle-track: #334155;
   --color-toggle-thumb: #F1F5F9;
   --color-toggle-icon: #94A3B8;
