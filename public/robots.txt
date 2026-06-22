@@ -3,7 +3,7 @@ User-agent: *
 Allow: /
 
 # Host
-Host: https://www.pictools.one
+Host: https://pictools.one
 
 # Sitemaps
-Sitemap: https://www.pictools.one/sitemap.xml
+Sitemap: https://pictools.one/sitemap.xml
